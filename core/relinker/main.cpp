@@ -25,6 +25,10 @@
 #include <cwchar>
 #endif
 
+#ifdef __APPLE__
+#include <unistd.h>
+#endif
+
 #include "RelinkerRevision.hpp"
 
 #if defined(_WIN32) && defined(__MINGW32__)
@@ -261,6 +265,20 @@ int RunVerifyPatches(const Cli::Args& args) {
 }
 
 int Run(const int argc, char* argv[]) {
+#ifdef __APPLE__
+    if (argc >= 2 && std::string_view(argv[1]) == "--ui") {
+        std::filesystem::path selfPath = argv[0];
+        auto uiPath = selfPath.parent_path() / "anyps5-ui";
+        if (!std::filesystem::exists(uiPath)) uiPath = selfPath.parent_path() / ".." / "ui" / "anyps5-ui";
+        if (!std::filesystem::exists(uiPath)) uiPath = selfPath.parent_path() / ".." / "anyps5-ui";
+        if (std::filesystem::exists(uiPath)) {
+            char* uiArgv[] = {const_cast<char*>(uiPath.c_str()), nullptr};
+            execv(uiPath.c_str(), uiArgv);
+        }
+        std::cerr << "FAIL: Cannot locate anyps5-ui executable\n";
+        return 1;
+    }
+#endif
     Cli::Args args;
     try {
         args = Cli::ParseArgs(argc, argv);

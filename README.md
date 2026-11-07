@@ -2,9 +2,54 @@
 
 # About
 
-Tool for automatic executables porting to Linux and Windows.
+**PsOnMac** is a high-performance native macOS Apple Silicon port of AnyPS5, relinking PlayStation 5 executables into native Mach-O binaries running against reimplemented system libraries and a direct Apple Metal 3.1 graphics backend.
 
-The relinker-only build runs on macOS, including Apple silicon.
+The tool provides automatic executable porting to macOS, Linux, and Windows with zero emulation overhead.
+
+---
+
+## PsOnMac Highlights (macOS on Apple Silicon)
+
+- **Zero Translation Layers**: AGC command buffers execute directly via Apple Metal (`core/gpu/metal/`). No MoltenVK, no Wine, and no translation wrappers.
+- **Direct RDNA2 -> Metal Shading Language Recompiler**: RDNA2 SSA IR is lowered directly to MSL 3.1 shaders (`core/shader/recompiler/MslBackend/`) utilizing 32-wide `simdgroup` operations.
+- **Unified Memory Architecture (UMA)**: Zero-copy guest-host arena using a 2 TiB virtual address space mapped via `mach_vm_remap`.
+- **Low-Overhead Synchronization**: Ultra-fast atomic wait/wake powered by native macOS 14.4+ `os_sync_wait_on_address`.
+- **Native Audio Unit**: Low-latency 48kHz stereo PCM presentation via Apple CoreAudio HAL (`CoreAudioOut.cpp`).
+- **Native Metal GUI Launcher (`anyps5-ui`)**: Sleek Cocoa + Metal launcher featuring a live 60 FPS Metal shader canvas, DualSense controller diagnostics, drag-and-drop game relinking, and standalone homebrew ELF support.
+
+---
+
+## Quick Start on macOS
+
+### 1. Build Native Apple Silicon Binaries
+```sh
+cmake --preset macos-arm64
+cmake --build build-macos-arm64
+```
+
+### 2. Launch the Graphical User Interface
+```sh
+./build-macos-arm64/anyps5-ui
+```
+*(Or launch via the relinker: `./build-macos-arm64/core/relinker/relinker --ui`)*
+
+### 3. Relink PS5 Executables via CLI
+```sh
+./build-macos-arm64/core/relinker/relinker --macos --to-rosetta /path/to/game/eboot.bin ./game-macos
+```
+*(For standalone homebrew ELFs without a `sce_module` directory, add `--skip-sce-module --skip-syscall-check`)*
+
+---
+
+## Technical Documentation
+
+- [macOS Architecture & Subsystems](docs/dev/macos/ARCHITECTURE.md)
+- [Performance & Bandwidth Characterization](docs/dev/macos/PERF.md)
+- [Hardware & Architecture Limitations](docs/dev/macos/LIMITATIONS.md)
+- [macOS Direct I/O & Filesystem](docs/dev/macos/FILESYSTEM.md)
+- [Spike Verification & Research Findings](docs/dev/macos/RESEARCH.md)
+
+---
 
 [**Web converter**](https://boykopovar.github.io/AnyPS5/) - files stay on your device.
 

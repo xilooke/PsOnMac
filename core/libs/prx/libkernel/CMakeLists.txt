@@ -96,7 +96,8 @@ add_library(libkernel SHARED EXCLUDE_FROM_ALL
         ${CMAKE_CURRENT_SOURCE_DIR}/AppMetadata/src/ParamSfoParser.cpp
 )
 if(APPLE)
-    target_link_libraries(libkernel PRIVATE "-framework CoreFoundation")
+    target_link_libraries(libkernel PRIVATE "-framework CoreFoundation" platform_macos)
+    target_include_directories(libkernel PRIVATE ${CMAKE_SOURCE_DIR}/core/platform/macos/include)
     target_sources(libkernel PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/System/src/MacActivity.cpp)
 elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     target_sources(libkernel PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/System/src/GameModeClient.cpp)

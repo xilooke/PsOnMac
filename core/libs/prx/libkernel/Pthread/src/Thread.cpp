@@ -85,6 +85,7 @@ struct ThreadArgs {
 };
 
 #ifdef __APPLE__
+#include <platform/macos/QosThread.hpp>
 static void KeepHostFaultSignalsUnblocked(sigset_t& mask) {
     for (const int signal : {SIGSEGV, SIGBUS, SIGILL, SIGFPE, SIGTRAP}) sigdelset(&mask, signal);
 }
@@ -623,7 +624,14 @@ void SetLiveGuestThreadsAffinity(KernelCpumask mask) {
     std::lock_guard lock(registry.lock);
     registry.processAffinity = mask;
     for (const auto& [id, thread] : registry.threads) {
-        if (!thread->_finished.load(std::memory_order_acquire)) thread->affinity.store(mask, std::memory_order_relaxed);
+        if (!thread->_finished.load(std::memory_order_acquire)) {
+            thread->affinity.store(mask, std::memory_order_relaxed);
+#ifdef __APPLE__
+            if (thread->hostThread) {
+                Platform::MacOs::QosThread::SetThreadAffinityTag(thread->hostThread, static_cast<std::uint32_t>(mask));
+            }
+#endif
+        }
     }
 }
 
@@ -708,6 +716,11 @@ bool SetLiveGuestThreadAffinity_nid_no_patch(std::int64_t tid, KernelCpumask mas
     for (const auto& [id, thread] : registry.threads) {
         if (thread->tid != tid || thread->_finished.load(std::memory_order_acquire)) continue;
         thread->affinity.store(mask, std::memory_order_relaxed);
+#ifdef __APPLE__
+        if (thread->hostThread) {
+            Platform::MacOs::QosThread::SetThreadAffinityTag(thread->hostThread, static_cast<std::uint32_t>(mask));
+        }
+#endif
         return true;
     }
     return false;
@@ -1094,6 +1107,12 @@ static void* StartNativeThread(void* opaque) {
 #if defined(__linux__)
         self->hostTid = static_cast<int>(gettid());
         RegisterGuestStackMapping(self);
+#elif defined(__APPLE__)
+        Platform::MacOs::QosThread::SetCurrentThreadGuestPriority(self->priority.load(std::memory_order_relaxed));
+        const auto mask = self->affinity.load(std::memory_order_relaxed);
+        if (mask != 0) {
+            Platform::MacOs::QosThread::SetCurrentThreadAffinityTag(static_cast<std::uint32_t>(mask));
+        }
 #endif
         args->initialized.set_value();
     } catch (...) {
@@ -1515,6 +1534,11 @@ int APS5_VABI scePthreadSetaffinity(Pthread thread, KernelCpumask mask) {
     auto registered = LockRegisteredGuestThread(thread);
     if (!registered) return SCE_KERNEL_ERROR_ESRCH;
     thread->affinity.store(mask, std::memory_order_relaxed);
+#ifdef __APPLE__
+    if (thread->hostThread) {
+        Platform::MacOs::QosThread::SetThreadAffinityTag(thread->hostThread, static_cast<std::uint32_t>(mask));
+    }
+#endif
     return SCE_OK;
 }
 
@@ -1548,6 +1572,11 @@ int APS5_VABI scePthreadSetprio(Pthread thread, int prio) {
         return SCE_KERNEL_ERROR_EINVAL;
     }
     thread->priority.store(prio, std::memory_order_relaxed);
+#ifdef __APPLE__
+    if (CurrentGuestState().current == thread) {
+        Platform::MacOs::QosThread::SetCurrentThreadGuestPriority(prio);
+    }
+#endif
     return SCE_OK;
 }
 

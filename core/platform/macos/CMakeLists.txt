@@ -27,6 +27,7 @@ add_library(platform_macos STATIC
     src/QosThread.cpp
     src/MachExceptionHandler.cpp
     src/MetalSurface.mm
+    src/CoreAudioOut.cpp
     ${MACH_EXC_SERVER_C}
 )
 
@@ -48,6 +49,8 @@ if(APPLE)
         "-framework CoreFoundation"
         "-framework Metal"
         "-framework QuartzCore"
+        "-framework AudioToolbox"
+        "-framework CoreAudio"
     )
 endif()
 
@@ -71,4 +74,14 @@ if(BUILD_TESTING AND APPLE)
     target_link_libraries(mach_exception_handler_tests PRIVATE platform_macos)
     add_test(NAME mach_exception_handler COMMAND mach_exception_handler_tests)
     set_tests_properties(mach_exception_handler PROPERTIES TIMEOUT 20)
+
+    add_test_executable(core_audio_tests tests/CoreAudioTests.cpp)
+    target_link_libraries(core_audio_tests PRIVATE platform_macos)
+    add_test(NAME core_audio COMMAND core_audio_tests)
+    set_tests_properties(core_audio PROPERTIES TIMEOUT 20)
+
+    add_test_executable(file_semantics_tests tests/FileSemanticsTests.cpp)
+    target_link_libraries(file_semantics_tests PRIVATE platform_macos)
+    add_test(NAME file_semantics COMMAND file_semantics_tests)
+    set_tests_properties(file_semantics PROPERTIES TIMEOUT 20)
 endif()

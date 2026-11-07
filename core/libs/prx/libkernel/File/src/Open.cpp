@@ -276,6 +276,9 @@ static int OpenNative(const std::filesystem::path& native, int flags, std::uint1
             errno = EISDIR;
         }
     }
+    if (fd >= 0 && (flags & SCE_KERNEL_O_DIRECT) != 0) {
+        ::fcntl(fd, F_NOCACHE, 1);
+    }
 #endif
 #ifdef _WIN32
     if (fd < 0 && (errno != ENOENT || !native.has_filename())) {

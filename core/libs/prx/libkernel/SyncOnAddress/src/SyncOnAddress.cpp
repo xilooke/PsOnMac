@@ -19,6 +19,9 @@
 #include "prx/libkernel/KernelErrors.hpp"
 #include "prx/libkernel/Time/include/Time.hpp"
 #include "prx/libkernel/Time/include/TimedWait.hpp"
+#ifdef __APPLE__
+#include <platform/macos/OsSyncWait.hpp>
+#endif
 
 namespace {
 
@@ -242,6 +245,34 @@ int WaitOnAddress(TValue* address, TValue expected, KernelUseconds* timeout, con
     if (address == nullptr) {
         return SCE_KERNEL_ERROR_EFAULT;
     }
+#ifdef __APPLE__
+    if constexpr (sizeof(TValue) == 4 || sizeof(TValue) == 8) {
+        if (reinterpret_cast<std::uintptr_t>(address) % sizeof(TValue) == 0) {
+            const auto current = TryLoadAddressValue(address);
+            if (!current) {
+                return SCE_KERNEL_ERROR_EFAULT;
+            }
+            if (*current != expected) {
+                return SCE_KERNEL_ERROR_EAGAIN;
+            }
+            const uint32_t timeoutUs = timeout != nullptr ? *timeout : 0;
+            const auto start = std::chrono::steady_clock::now();
+            const bool woken = Platform::MacOs::OsSyncWait::WaitOnAddress(address, static_cast<std::uint64_t>(expected), timeoutUs, sizeof(TValue));
+            if (timeout != nullptr) {
+                const auto elapsedUs = static_cast<KernelUseconds>(std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::steady_clock::now() - start).count());
+                *timeout = *timeout > elapsedUs ? *timeout - elapsedUs : 0;
+            }
+            const auto postValue = TryLoadAddressValue(address);
+            if (!postValue) {
+                return SCE_KERNEL_ERROR_EFAULT;
+            }
+            if (!woken && timeout != nullptr && *timeout == 0) {
+                return SCE_KERNEL_ERROR_ETIMEDOUT;
+            }
+            return SYNC_ON_ADDRESS_OK;
+        }
+    }
+#endif
     const auto deadline = timeout == nullptr ? std::nullopt : std::optional<std::uint64_t>(TimedWait::DeadlineNanos(*timeout));
     bool differed = false;
     bool faulted = false;
@@ -287,6 +318,10 @@ std::int32_t WakeAddressLocked(std::uintptr_t key, std::int32_t count, bool wake
 std::int32_t WakeAddress(std::uintptr_t key, std::int32_t count, bool wakesAtLeastOne) {
     std::int32_t woken = 0;
     DeferringDelivery([&] { woken = WakeAddressLocked(key, count, wakesAtLeastOne); });
+#ifdef __APPLE__
+    Platform::MacOs::OsSyncWait::WakeByAddress(reinterpret_cast<const volatile void*>(key), count != 1, sizeof(std::uint64_t));
+    Platform::MacOs::OsSyncWait::WakeByAddress(reinterpret_cast<const volatile void*>(key), count != 1, sizeof(std::uint32_t));
+#endif
     return woken;
 }
 

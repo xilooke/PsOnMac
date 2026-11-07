@@ -5,6 +5,9 @@
 #include "prx/libkernel/AppMetadata/include/AppMetadata.hpp"
 #include "Decoder/Png.hpp"
 #include "SDL_vulkan.h"
+#ifdef __APPLE__
+#include "SDL_metal.h"
+#endif
 #include <chrono>
 #include <cstdio>
 #include <cstdlib>
@@ -76,7 +79,14 @@ void DisplayWindow::create(std::uint32_t sourceWidth, std::uint32_t sourceHeight
     AgcDriverLockVulkanLoader_nid_postfix();
     const char* fullscreen = std::getenv("ANYPS5_FULLSCREEN");
     const Uint32 fullscreenFlag = fullscreen != nullptr && *fullscreen != '\0' && std::strcmp(fullscreen, "0") != 0 ? static_cast<Uint32>(SDL_WINDOW_FULLSCREEN_DESKTOP) : 0u;
-    window = SDL_CreateWindow(title.value, SDL_WINDOWPOS_CENTERED_DISPLAY(displayIndex), SDL_WINDOWPOS_CENTERED_DISPLAY(displayIndex), static_cast<int>(initialSize.width), static_cast<int>(initialSize.height), SDL_WINDOW_SHOWN | SDL_WINDOW_VULKAN | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | fullscreenFlag);
+#ifdef __APPLE__
+    const char* backendEnv = std::getenv("ANYPS5_GPU_BACKEND");
+    const bool useMetal = backendEnv == nullptr || std::strcmp(backendEnv, "vulkan") != 0;
+    const Uint32 graphicsFlag = useMetal ? static_cast<Uint32>(SDL_WINDOW_METAL) : static_cast<Uint32>(SDL_WINDOW_VULKAN);
+#else
+    const Uint32 graphicsFlag = static_cast<Uint32>(SDL_WINDOW_VULKAN);
+#endif
+    window = SDL_CreateWindow(title.value, SDL_WINDOWPOS_CENTERED_DISPLAY(displayIndex), SDL_WINDOWPOS_CENTERED_DISPLAY(displayIndex), static_cast<int>(initialSize.width), static_cast<int>(initialSize.height), SDL_WINDOW_SHOWN | graphicsFlag | SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI | fullscreenFlag);
     AgcDriverUnlockVulkanLoader_nid_postfix();
     require(window != nullptr, SDL_GetError());
     SDL_SetWindowMinimumSize(window, static_cast<int>(DisplayWindowMinimumWidth), static_cast<int>(DisplayWindowMinimumHeight));
@@ -114,7 +124,17 @@ void DisplayWindow::DrawableSize(std::uint32_t& width, std::uint32_t& height) co
     }
     int drawableWidth = 0;
     int drawableHeight = 0;
+#ifdef __APPLE__
+    const char* backendEnv = std::getenv("ANYPS5_GPU_BACKEND");
+    const bool useMetal = backendEnv == nullptr || std::strcmp(backendEnv, "vulkan") != 0;
+    if (useMetal) {
+        SDL_Metal_GetDrawableSize(window, &drawableWidth, &drawableHeight);
+    } else {
+        SDL_Vulkan_GetDrawableSize(window, &drawableWidth, &drawableHeight);
+    }
+#else
     SDL_Vulkan_GetDrawableSize(window, &drawableWidth, &drawableHeight);
+#endif
     width = drawableWidth > 0 ? static_cast<std::uint32_t>(drawableWidth) : 0;
     height = drawableHeight > 0 ? static_cast<std::uint32_t>(drawableHeight) : 0;
 }

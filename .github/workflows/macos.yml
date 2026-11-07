@@ -1,0 +1,67 @@
+name: macOS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/macos.yml
+      - CMakeLists.txt
+      - CMakePresets.json
+      - 'core/**'
+      - 'docs/dev/macos/**'
+      - docs/dev/ENVIRONMENT.md
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+    paths:
+      - .github/workflows/macos.yml
+      - CMakeLists.txt
+      - CMakePresets.json
+      - 'core/**'
+      - 'docs/dev/macos/**'
+      - docs/dev/ENVIRONMENT.md
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  macos-arm64:
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          submodules: recursive
+      - name: Install Ninja
+        run: brew install ninja
+      - name: Configure macos-arm64
+        run: cmake --preset macos-arm64
+      - name: Build macos-arm64
+        run: cmake --build --preset macos-arm64
+      - name: Test macos-arm64
+        run: ctest --preset macos-arm64 --output-on-failure
+
+  macos-x86_64:
+    runs-on: macos-14
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+          submodules: recursive
+      - name: Install Ninja
+        run: brew install ninja
+      - name: Configure macos-x86_64
+        run: cmake --preset macos-x86_64
+      - name: Build macos-x86_64
+        run: cmake --build --preset macos-x86_64
+      - name: Test macos-x86_64
+        run: ctest --preset macos-x86_64 -R "mach_|qos_|os_sync_" --output-on-failure

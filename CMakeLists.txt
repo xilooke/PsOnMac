@@ -218,6 +218,24 @@ if(BUILD_TESTING)
         core/shader/recompiler/Optimization/include)
     add_test(NAME msl_emitter COMMAND msl_emitter_tests)
     set_tests_properties(msl_emitter PROPERTIES TIMEOUT 20)
+    add_test_executable(msl_fuzz_tests
+        core/shader/recompiler/MslBackend/tests/MslFuzzTests.cpp
+        core/shader/recompiler/MslBackend/src/MslEmitter.cpp
+        core/shader/recompiler/IntermediateRepresentation/src/IrProgram.cpp
+        core/shader/recompiler/IntermediateRepresentation/src/IrValue.cpp
+        core/shader/recompiler/IntermediateRepresentation/src/IrBlock.cpp
+        core/shader/recompiler/IntermediateRepresentation/src/IrOpcode.cpp
+        core/shader/recompiler/IntermediateRepresentation/src/IrType.cpp
+        core/shader/recompiler/IntermediateRepresentation/src/GuestRegister.cpp)
+    target_include_directories(msl_fuzz_tests PRIVATE
+        core/shader/recompiler
+        core/shader/recompiler/MslBackend/include
+        core/shader/recompiler/IntermediateRepresentation/include
+        core/shader/recompiler/RdnaDecoder/include
+        core/shader/recompiler/ControlFlow/include
+        core/shader/recompiler/Optimization/include)
+    add_test(NAME msl_fuzz COMMAND msl_fuzz_tests)
+    set_tests_properties(msl_fuzz PROPERTIES TIMEOUT 20)
     add_test_executable(pad_command_file_tests core/libs/prx/libScePad/tests/InputCommandFile.cpp)
     target_include_directories(pad_command_file_tests PRIVATE core/libs)
     add_test(NAME pad_command_file COMMAND pad_command_file_tests)

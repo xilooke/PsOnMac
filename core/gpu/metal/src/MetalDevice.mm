@@ -153,3 +153,14 @@ std::shared_ptr<Rhi::IDevice> CreateMetalDevice(void* mtlDevice) {
 }
 
 } // namespace AnyPS5::Gpu::Metal
+
+namespace AnyPS5::Gpu::Rhi {
+
+std::shared_ptr<IDevice> CreateDevice(BackendType type) {
+    if (type == BackendType::Metal) {
+        return Metal::CreateMetalDevice();
+    }
+    throw std::runtime_error("Unsupported backend type for platform");
+}
+
+} // namespace AnyPS5::Gpu::Rhi

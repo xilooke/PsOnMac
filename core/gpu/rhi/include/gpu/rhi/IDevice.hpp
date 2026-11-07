@@ -47,6 +47,8 @@ public:
     virtual void WaitIdle() = 0;
 };
 
+std::shared_ptr<IDevice> CreateDevice(BackendType type = BackendType::Metal);
+
 } // namespace AnyPS5::Gpu::Rhi
 
 #endif

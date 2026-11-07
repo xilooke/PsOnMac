@@ -708,6 +708,7 @@ endif()
 
 if(APPLE)
     add_subdirectory(core/platform/macos)
+    add_subdirectory(core/gpu/metal)
 endif()
 add_subdirectory(core/gpu/rhi)
 

@@ -751,6 +751,7 @@ struct VertexInputPatch {
 struct CompiledShaderArtifact {
     std::vector<VertexInputPatch> vertexInputPatches;
     SharedSpirv spirv;
+    std::string msl;
     std::uint32_t memoryOffsetDword = 0;
     std::uint32_t shaderDataDwords = 0;
     std::uint32_t imageMetadataDword = 0;

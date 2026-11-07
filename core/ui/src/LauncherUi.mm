@@ -408,26 +408,99 @@
     if (!self.selectedExecutablePath) return;
 
     NSString* appDir = [[NSBundle mainBundle] bundlePath];
-    NSString* relinkerPath = [appDir stringByAppendingPathComponent:@"core/relinker/relinker"];
-    if (![[NSFileManager defaultManager] fileExistsAtPath:relinkerPath]) {
-        relinkerPath = @"./build-macos-arm64/core/relinker/relinker";
+    NSArray* searchPaths = @[
+        [appDir stringByAppendingPathComponent:@"core/relinker/relinker"],
+        [[appDir stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"core/relinker/relinker"],
+        [[appDir stringByDeletingLastPathComponent] stringByAppendingPathComponent:@"relinker/relinker"],
+        @"/Users/ushin/AnyPS5/build-macos-arm64/core/relinker/relinker",
+        @"./build-macos-arm64/core/relinker/relinker"
+    ];
+
+    NSString* relinkerPath = nil;
+    for (NSString* path in searchPaths) {
+        if ([[NSFileManager defaultManager] isExecutableFileAtPath:path]) {
+            relinkerPath = path;
+            break;
+        }
     }
-
-    NSString* outputPath = [NSTemporaryDirectory() stringByAppendingPathComponent:@"anyps5_launch_target"];
-
-    NSArray* args = @[@"--macos", @"--to-rosetta", @"--autorun", self.selectedExecutablePath, outputPath];
-    NSTask* task = [[NSTask alloc] init];
-    task.executableURL = [NSURL fileURLWithPath:relinkerPath];
-    task.arguments = args;
-
-    NSError* error = nil;
-    [task launchAndReturnError:&error];
-    if (error) {
+    if (!relinkerPath) {
         NSAlert* alert = [[NSAlert alloc] init];
-        alert.messageText = @"Relinker Launch Error";
-        alert.informativeText = error.localizedDescription;
+        alert.messageText = @"Relinker Not Found";
+        alert.informativeText = @"Cannot locate the AnyPS5 relinker executable.";
         [alert runModal];
+        return;
     }
+
+    NSString* parentDir = [self.selectedExecutablePath stringByDeletingLastPathComponent];
+    NSString* sceModuleDir = [parentDir stringByAppendingPathComponent:@"sce_module"];
+    BOOL hasSceModule = [[NSFileManager defaultManager] fileExistsAtPath:sceModuleDir];
+
+    NSString* fileName = [self.selectedExecutablePath lastPathComponent];
+    NSString* fileStem = [fileName stringByDeletingPathExtension];
+    NSString* outputPath = [parentDir stringByAppendingPathComponent:[NSString stringWithFormat:@"%@-macos", fileStem]];
+
+    NSMutableArray* args = [NSMutableArray arrayWithArray:@[@"--macos", @"--to-rosetta"]];
+    if (!hasSceModule) {
+        [args addObject:@"--skip-sce-module"];
+    }
+    [args addObject:@"--skip-syscall-check"];
+    [args addObject:self.selectedExecutablePath];
+    [args addObject:outputPath];
+
+    self.selectedPathLabel.stringValue = [NSString stringWithFormat:@"Relinking %@...", fileName];
+    self.selectedPathLabel.textColor = [NSColor colorWithCalibratedRed:1.0 green:0.8 blue:0.2 alpha:1.0];
+    self.launchButton.enabled = NO;
+
+    __weak AnyPS5LauncherWindowController* weakSelf = self;
+    dispatch_async(dispatch_get_global_queue(DISPATCH_QUEUE_PRIORITY_DEFAULT, 0), ^{
+        NSTask* task = [[NSTask alloc] init];
+        task.executableURL = [NSURL fileURLWithPath:relinkerPath];
+        task.arguments = args;
+
+        NSPipe* errPipe = [NSPipe pipe];
+        task.standardError = errPipe;
+        NSPipe* outPipe = [NSPipe pipe];
+        task.standardOutput = outPipe;
+
+        NSError* error = nil;
+        [task launchAndReturnError:&error];
+        if (error) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                weakSelf.launchButton.enabled = YES;
+                weakSelf.selectedPathLabel.stringValue = [NSString stringWithFormat:@"Error: %@", error.localizedDescription];
+                weakSelf.selectedPathLabel.textColor = [NSColor colorWithCalibratedRed:1.0 green:0.3 blue:0.3 alpha:1.0];
+                NSAlert* alert = [[NSAlert alloc] init];
+                alert.messageText = @"Relinker Launch Error";
+                alert.informativeText = error.localizedDescription;
+                [alert runModal];
+            });
+            return;
+        }
+
+        [task waitUntilExit];
+        int status = task.terminationStatus;
+
+        dispatch_async(dispatch_get_main_queue(), ^{
+            weakSelf.launchButton.enabled = YES;
+            if (status == 0) {
+                weakSelf.selectedPathLabel.stringValue = [NSString stringWithFormat:@"Success! Converted: %@", outputPath];
+                weakSelf.selectedPathLabel.textColor = [NSColor colorWithCalibratedRed:0.2 green:1.0 blue:0.4 alpha:1.0];
+                NSAlert* alert = [[NSAlert alloc] init];
+                alert.messageText = @"Conversion Complete!";
+                alert.informativeText = [NSString stringWithFormat:@"PS5 executable converted successfully to native macOS Mach-O:\n%@", outputPath];
+                [alert runModal];
+            } else {
+                NSData* errData = [errPipe.fileHandleForReading readDataToEndOfFile];
+                NSString* errStr = [[NSString alloc] initWithData:errData encoding:NSUTF8StringEncoding];
+                weakSelf.selectedPathLabel.stringValue = @"Relinking failed. See details.";
+                weakSelf.selectedPathLabel.textColor = [NSColor colorWithCalibratedRed:1.0 green:0.3 blue:0.3 alpha:1.0];
+                NSAlert* alert = [[NSAlert alloc] init];
+                alert.messageText = @"Relinking Failed";
+                alert.informativeText = errStr.length > 0 ? errStr : @"An unknown error occurred during conversion.";
+                [alert runModal];
+            }
+        });
+    });
 }
 
 - (void)windowWillClose:(NSNotification*)notification {

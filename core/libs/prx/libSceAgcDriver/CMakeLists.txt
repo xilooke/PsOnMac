@@ -341,6 +341,7 @@ set(agcDriverSources
         ${CMAKE_CURRENT_SOURCE_DIR}/Execution/src/DisplayFormat.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Execution/src/HostHdr.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Execution/src/Driver/DeviceAccess.cpp
+        ${CMAKE_CURRENT_SOURCE_DIR}/Execution/src/Driver/GpuBackend.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Execution/src/Driver/Diagnostics.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Execution/src/Driver/Dispatch/DataHitVerification.cpp
         ${CMAKE_CURRENT_SOURCE_DIR}/Execution/src/Driver/Dispatch/Dispatch.cpp
@@ -517,6 +518,7 @@ target_include_directories(libSceAgcDriver PRIVATE
         ${CMAKE_SOURCE_DIR}/core/shader/recompiler/RdnaDecoder/include
         ${ANYPS5_VULKAN_HEADERS_INCLUDE_DIR}
         ${ANYPS5_SPIRV_HEADERS_INCLUDE_DIR}
+        ${CMAKE_SOURCE_DIR}/core/gpu/rhi/include
 )
 
 file(GLOB_RECURSE agcShaderCacheGuardSources CONFIGURE_DEPENDS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -535,6 +537,7 @@ target_include_directories(libSceAgcDriver INTERFACE
 )
 
 target_link_libraries(libSceAgcDriver PRIVATE
+        gpu_rhi
         shader_recompiler_agc_driver
         decoder_png
         SDL2-static

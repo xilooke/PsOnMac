@@ -1,14 +1,18 @@
 cmake_minimum_required(VERSION 3.20)
-if(APPLE)
+project(Relinker CXX)
+
+if(APPLE OR CMAKE_SYSTEM_NAME STREQUAL "Darwin")
     if(NOT CMAKE_OSX_ARCHITECTURES)
         if(CMAKE_SYSTEM_PROCESSOR)
-            set(CMAKE_OSX_ARCHITECTURES "${CMAKE_SYSTEM_PROCESSOR}" CACHE STRING "Architectures built on macOS")
+            set(CMAKE_OSX_ARCHITECTURES "${CMAKE_SYSTEM_PROCESSOR}" CACHE STRING "Architectures built on macOS" FORCE)
+        elseif(CMAKE_HOST_SYSTEM_PROCESSOR)
+            set(CMAKE_OSX_ARCHITECTURES "${CMAKE_HOST_SYSTEM_PROCESSOR}" CACHE STRING "Architectures built on macOS" FORCE)
         else()
-            set(CMAKE_OSX_ARCHITECTURES "${CMAKE_HOST_SYSTEM_PROCESSOR}" CACHE STRING "Architectures built on macOS")
+            execute_process(COMMAND uname -m OUTPUT_VARIABLE ANYPS5_MACOS_UNAME OUTPUT_STRIP_TRAILING_WHITESPACE)
+            set(CMAKE_OSX_ARCHITECTURES "${ANYPS5_MACOS_UNAME}" CACHE STRING "Architectures built on macOS" FORCE)
         endif()
     endif()
 endif()
-project(Relinker CXX)
 
 set(ANYPS5_TEST_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/tests")
 
@@ -687,13 +691,14 @@ endif()
 if(APPLE)
     add_subdirectory(core/platform/macos)
 endif()
+add_subdirectory(core/gpu/rhi)
 
 if(ANYPS5_RELINKER_ONLY)
     add_subdirectory(core/relinker)
     return()
 endif()
 
-if(APPLE AND NOT CMAKE_OSX_ARCHITECTURES MATCHES "^(arm64|x86_64)$")
+if((APPLE OR CMAKE_SYSTEM_NAME STREQUAL "Darwin") AND NOT CMAKE_OSX_ARCHITECTURES MATCHES "^(arm64|x86_64)$")
     message(FATAL_ERROR "macOS build supports arm64 or x86_64 architectures; got: ${CMAKE_OSX_ARCHITECTURES}")
 endif()
 
@@ -800,10 +805,6 @@ if(WIN32 OR APPLE OR (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND NOT ANYPS5_ENABLE_A
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         target_link_options(mimalloc PRIVATE LINKER:--as-needed)
     endif()
-endif()
-
-if(APPLE)
-    add_subdirectory(core/platform/macos)
 endif()
 
 add_subdirectory(core/shader/recompiler)
